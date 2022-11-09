@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>
+            Minesweeper
+        </title>
+        <style>
+            button{
+                width: 30px;
+                height: 30px;
+                background-color: black;
+                color: white;
+            }
+        </style>
+    </head>
+    
+    <body onload = "play()" oncontextmenu = "window, event, returnvalue = false">
+        <script language = "javascript">
+            var numMines = 10; /* 地雷數量 */
+            var mineRow = 10; /* 踩雷區-列 */
+            var mineColumn = 10; /* 踩雷區-行 */
+            var bombs = new Array(); /* 地雷位置 */
+            var gametimer; /* 控制timer關閉 */
+            var timerstart = 0; /* 控制timer開啟 */
+            for (var i = 0; i < numMines; i++) {
+                bombs[i] = new Array();
+            }
+
+            function initset()
+            {
+                numMines = document.getElementById('numMines').value;
+                mineRow  = document.getElementById('mineRow').value;
+                mineColumn = document.getElementById('mineColumn').value;
+                if (!isNaN(numMines) && !isNaN(mineRow) && !isNaN(mineColumn)) {
+                    numMines = parseInt(numMines);
+                    mineRow = parseInt(mineRow);
+                    mineColumn = parseInt(mineColumn);
+                    if (numMines > mineColumn * mineRow) 
+                        numMines = mineColumn * mineRow;
+                } else {
+                    alert("請輸入正確數字!");
+                    return 0;
+                }
+                delete_map();
+                timerstart = 0;
+                /* 取 HTML timer 值 */
+                var timer_set = document.getElementById('timer');
+                timer_set.innerHTML = 0;
+                clearTimeout(gametimer); /* 關閉計時器 */
+                for (var i = 0; i < numMines; i++) {  /* 初始化 */
+                    bombs[0][i] = 0;
+                    bombs[1][i] = 0;
+                }
+                play();
+            }
+
+            function set_bombs()
+            {
+                for (var i = 0; i < numMines; i++) {
+                    bombs[0][i] = Math.floor(Math.random() * mineRow);
+                    bombs[1][i] = Math.floor(Math.random() * mineColumn);
+                    for (var j = 0; j < i; j++) {
+                        if(bombs[1][j] == bombs[1][i] && bombs[0][j] == bombs[0][i])
+                            i--;
+                    }
+                }
+            }
+
+            function play()
+            {
+                var mine = document.getElementById('mine'); /* 取得踩雷區 */  
+                set_bombs();
+                for (var i = 0; i < mineRow; i++) { /* 列 */
+                    for (var j = 0; j < mineColumn; j++) { /* 行 */
+                        var cell = document.createElement('button');
+                        cell.setAttribute('id', i + '_' + j);
+                        cell.setAttribute('onClick', 'sweep(this)');
+                        cell.setAttribute('oncontextmenu', 'check_button(this)');
+                        /* 用來判斷方塊有沒有被掃過 */
+                        cell.setAttribute('data-check', 'false');
+                        cell.innerHTML = '&nbsp';
+                        mine.appendChild(cell);
+                    }
+                    mine.innerHTML += '<br>';
+                }
+                document.getElementById('remain').innerHTML = numMines;
+            }
+
+            function sweep(obj)
+            {
+                var coordinate = obj.id.split('_'), count = 0; /* 計算炸彈的數量 */
+                if (!timerstart) { /* 開啟timer */
+                    timer();
+                    timerstart = 1;
+                }
+                if (obj.innerHTML == '*')
+                    return 0; /*處於標記狀態*/
+
+                for (var i = 0; i < numMines; i++) {
+                    /* 剛好按到地雷的話 */
+                    if (coordinate[0] == bombs[0][i] && 
+                        coordinate[1] == bombs[1][i]) {
+                        close_all();
+                        return 0;
+                    }
+                }
+                /* 計算炸彈數量 */
+                count = calculate_bombs(
+                        parseInt(coordinate[0]), parseInt(coordinate[1]));
+                
+                if (count == 0) {
+                    findblock(parseInt(coordinate[0]), parseInt(coordinate[1]));
+                } else {
+                    obj.innerHTML = count;
+                    obj.disabled = "true";
+                }
+                check_win();
+            }
+
+            function mark(obj)
+            {
+                var remain = document.getElementById('remain');
+                if (obj.innerHTML == '*') {
+                    remain.innerHTML = parseInt(remain.innerHTML) + 1;
+                    obj.innerHTML = '&nbsp'
+                } else {
+                    if(!parseInt(remain.innerHTML)) {
+                        alert("已沒有旗標可設置");
+                    } else {
+                        remain.innerHTML = parseInt(remain.innerHTML) - 1;
+                        obj.innerHTML = '*';
+                    }
+                }
+            }
+            
+            function timer()
+            {
+                var timer_set = document.getElementById('timer');
+                if (timerstart)
+                    timer_set.innerHTML = parseInt(timer_set.innerHTML) + 1;
+                gametimer = setTimeout('timer()', 1000); /* 每一秒執行一次 */
+            }
+
+            function findblock(row, column) /* 按到 0 時開始計算旁邊方塊 */
+            { 
+                var cell = document.getElementById(
+                            row.toString() + '_' + column.toString());
+                var count = calculate_bombs(row, column); /* 計算炸彈數量 */
+                if (!count) {
+                    if(parseInt(row) >= 0 && parseInt(row) < mineRow &&
+                       parseInt(column) >= 0 && parseInt(column) < mineColumn &&
+                       cell.innerHTML != "*") {
+                        cell.innerHTML = "&nbsp";
+                        if (cell.dataset.check == "false") {
+                            cell.dataset.check = "true";
+                            cell.disabled = "true";
+                            /* 掃描正右方 */
+                            findblock(parseInt(row), parseInt(column + 1));
+                            /* 掃描正上方 */
+                            findblock(parseInt(row - 1), parseInt(column));
+                            /* 掃描正左方 */
+                            findblock(parseInt(row), parseInt(column - 1));
+                            /* 掃描正下方 */
+                            findblock(parseInt(row + 1), parseInt(column));
+                        }
+                    }
+                } else {
+                    if (cell.innerHTML != "*") {
+                        cell.innerHTML = count;
+                        cell.disabled = "true";
+                    }
+                }
+                return 0;
+            }
+
+            function calculate_bombs(row, column)
+            { /* 計算炸彈數量 */
+                var count = 0;
+                /* 九宮格 row 部分 */
+                for (var i = row - 1; i <= row + 1; i++) {
+                    /* 九宮格 column 部分 */
+                    for (var j = column - 1; j <= column + 1; j++) {
+                        for (var k = 0; k < numMines; k++) { /* 掃描所有炸彈 */
+                            /* 判斷9宮格中是否有炸彈 */
+                            if (i == bombs[0][k] && j == bombs[1][k])
+                                count++;
+                        }
+                    }
+                }
+                return count;
+            }
+
+            function check_win()
+            {
+                var count = 0; /* 計算幾個非炸彈的方塊被按下 */
+                for (var i = 0; i < mineRow; i++) {
+                    for (var j = 0; j < mineColumn; j++) {
+                        var cell = document.getElementById(
+                            i.toString() + '_' + j.toString());
+                        if (cell.disabled)
+                            count++;
+                    }
+                }
+                if (count == mineRow * mineColumn - numMines) {
+                    alert("You Win!!");
+                    clearTimeout(gametimer); /* 關閉計時器 */
+                }
+            }
+
+            function check_button(obj)
+            {
+                var check = event.srcElement.tagName;
+                if (check == "BUTTON") {
+                    mark(obj);
+                    return window.event.returnValue = false;
+                } else {
+                    return true;
+                }
+            }
+
+            function close_all()
+            {
+                for (var i = 0; i < mineRow; i++) {
+                    for (var j = 0; j < mineColumn; j++) {
+                        var cell = document.getElementById(
+                            i.toString() + '_' + j.toString());
+
+                        for (var k = 0; k < numMines; k++) {
+                            if(i == bombs[0][k] && j == bombs[1][k])
+                                cell.innerHTML = 'X';
+                        }
+                        cell.disabled = "true";
+                    }
+                }
+                alert("Game Over");
+                clearTimeout(gametimer); /* 關閉計時器 */
+            }
+
+            function delete_map()
+            {
+                var mine = document.getElementById('mine');
+                mine.innerHTML = " ";
+            }
+        </script>
+        <center>
+            踩地雷小遊戲<br>
+            規則<br>
+            <table border = "1" width = "500" height = "200">
+                <th align = "left">
+                    1. 可自行輸入大小及炸彈數量 (預設大小為10 x 10，炸彈數為 10)<br>
+                    2. 滑鼠點擊後會開始計時<br>
+                    3. 遊戲結束時會顯示總時間時數，如果按到炸彈會顯示所有炸彈位置<br>
+                    4. 按下方塊會顯示周圍方塊數 (0的時候顯示空白，並往外擴張)<br>
+                    5. 方塊被按下後，不可再按方塊<br>
+                    6. 滑鼠右鍵可以標記，再按一次可以關閉(被標記後不可被滑鼠左鍵按開)<br>
+                    7. "設定"按鈕用來設定新的大小及炸彈數<br>
+                    8. 底下的Reset為重新整理<br>
+                </th>
+            </table>
+            設定地圖列數 : <input id = 'mineRow' type = 'text' value = '10'><br>
+            設定地圖行數 : <input id = 'mineColumn' type = 'text' value = '10'><br>
+            設定炸彈數目 : <input id = 'numMines' type = 'text' value = '10'><br>
+            <input type = "button" value = "設定" onClick = "initset()">
+            <div id = "mine"></div>     <!--放置地雷-->
+            計時時間 : <div id = "timer">0</div>   <!--計時器-->
+            可標記數量 : <div id = "remain">0</div>  <!--剩餘地雷數量-->
+            <a href="#" onclick="javascript:window.location.reload()">Reset</a>
+        </center>
+    </body>
+</html>
